@@ -139,7 +139,7 @@ if __name__ == "__main__":
         #--------------------------------------------#
         #   batch_size不要太小，不然训练效果很差
         #--------------------------------------------#
-        batch_size      = 16
+        batch_size      = 32
         Lr              = 1e-3
         Init_Epoch      = 0
         Freeze_Epoch    = 50
@@ -195,7 +195,7 @@ if __name__ == "__main__":
         #--------------------------------------------#
         #   batch_size不要太小，不然训练效果很差
         #--------------------------------------------#
-        batch_size      = 16
+        batch_size      = 32
         Lr              = 1e-4
         Freeze_Epoch    = 50
         Epoch           = 100
@@ -206,10 +206,10 @@ if __name__ == "__main__":
         if epoch_step == 0 or epoch_step_val == 0:
             raise ValueError("数据集过小，无法进行训练，请扩充数据集。")
 
+        print('Train on {} samples, val on {} samples, with batch size {}.'.format(num_train, num_val, batch_size))
+
         train_dataloader    = ClsDatasets(lines[:num_train], input_shape, batch_size, num_classes, train = True)
         val_dataloader      = ClsDatasets(lines[num_train:], input_shape, batch_size, num_classes, train = False)
-
-        print('Train on {} samples, val on {} samples, with batch size {}.'.format(num_train, num_val, batch_size))
 
         if eager:
             gen             = tf.data.Dataset.from_generator(partial(train_dataloader.generate), (tf.float32, tf.float32))
