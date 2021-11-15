@@ -1,9 +1,13 @@
 import numpy as np
+import tensorflow as tf
 from PIL import Image
 
-from classification import Classification, preprocess_input, cvtColor
+from classification import Classification, cvtColor, preprocess_input
 from utils.utils import letterbox_image
 
+gpus = tf.config.experimental.list_physical_devices(device_type='GPU')
+for gpu in gpus:
+    tf.config.experimental.set_memory_growth(gpu, True)
 
 class top5_Classification(Classification):
     def detect_image(self, image):
