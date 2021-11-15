@@ -1,4 +1,4 @@
-## Classification：分类模型在Keras当中的实现
+## Classification：分类模型在Tensorflow2当中的实现
 ---
 
 ### 目录
@@ -10,8 +10,7 @@
 6. [参考资料 Reference](#Reference)
 
 ### 所需环境
-tensorflow-gpu==1.13.1   
-keras==2.1.5   
+tensorflow-gpu==2.2.0   
 
 ### 文件下载
 训练所需的预训练权重都可以在百度云下载。     
