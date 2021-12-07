@@ -2,7 +2,7 @@ from tensorflow.keras.layers import Conv2D, Dense, Flatten, Input, MaxPooling2D
 from tensorflow.keras.models import Model
 
 
-def VGG16(input_shape=None, num_classes=1000):
+def VGG16(input_shape=None, classes=1000):
     img_input = Input(shape=input_shape)
 
     # Block 1
@@ -86,7 +86,7 @@ def VGG16(input_shape=None, num_classes=1000):
     x = Flatten(name='flatten')(x)
     x = Dense(4096, activation='relu', name='fc1')(x)
     x = Dense(4096, activation='relu', name='fc2')(x)
-    x = Dense(num_classes, activation='softmax', name='predictions')(x)
+    x = Dense(classes, activation='softmax', name='predictions')(x)
 
     inputs = img_input
 
