@@ -3,7 +3,7 @@ from tqdm import tqdm
 
 # 防止bug
 def get_train_step_fn():
-    # @tf.function
+    @tf.function
     def train_step(batch_images, batch_labels, net, optimizer):
         with tf.GradientTape() as tape:
             predict = net([batch_images], training=True)
