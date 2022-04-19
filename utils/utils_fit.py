@@ -4,11 +4,16 @@ import tensorflow as tf
 from tqdm import tqdm
 
 
-# 防止bug
-def get_train_step_fn():
+#------------------------------#
+#   防止bug
+#------------------------------#
+def get_train_step_fn(strategy):
     @tf.function
     def train_step(batch_images, batch_labels, net, optimizer):
         with tf.GradientTape() as tape:
+            #------------------------------#
+            #   计算loss
+            #------------------------------#
             predict = net([batch_images], training=True)
             loss_value = tf.reduce_mean(tf.losses.categorical_crossentropy(batch_labels, predict))
 
@@ -16,7 +21,18 @@ def get_train_step_fn():
         optimizer.apply_gradients(zip(grads, net.trainable_variables))
         acc     = tf.reduce_mean(tf.cast(tf.equal(tf.argmax(predict, axis=-1), tf.argmax(batch_labels, axis=-1)), tf.float32))
         return loss_value, acc
-    return train_step
+    
+    if strategy == None:
+        return train_step
+    else:
+        #----------------------#
+        #   多gpu训练
+        #----------------------#
+        @tf.function
+        def distributed_train_step(images, targets, net, optimizer):
+            per_replica_losses, per_replica_acc = strategy.run(train_step, args=(images, targets, net, optimizer,))
+            return strategy.reduce(tf.distribute.ReduceOp.MEAN, per_replica_losses, axis=None), strategy.reduce(tf.distribute.ReduceOp.MEAN, per_replica_acc, axis=None)
+        return distributed_train_step
 
 @tf.function
 def val_step(batch_images, batch_labels, net, optimizer):
@@ -25,8 +41,8 @@ def val_step(batch_images, batch_labels, net, optimizer):
     acc         = tf.reduce_mean(tf.cast(tf.equal(tf.argmax(predict, axis=-1), tf.argmax(batch_labels, axis=-1)), tf.float32))
     return loss_value, acc
 
-def fit_one_epoch(net, loss_history, optimizer, epoch, epoch_step, epoch_step_val, gen, gen_val, Epoch, save_period, save_dir):
-    train_step  = get_train_step_fn()
+def fit_one_epoch(net, loss_history, optimizer, epoch, epoch_step, epoch_step_val, gen, gen_val, Epoch, save_period, save_dir, strategy):
+    train_step  = get_train_step_fn(strategy)
 
     total_loss  = 0
     total_acc   = 0

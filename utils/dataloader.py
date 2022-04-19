@@ -2,16 +2,17 @@ import math
 from random import shuffle
 
 import cv2
-from tensorflow import keras
 import numpy as np
-from tensorflow.python.keras.utils.np_utils import to_categorical
 from PIL import Image
+from tensorflow import keras
+from tensorflow.python.keras.utils.np_utils import to_categorical
 
 from .utils import cvtColor, preprocess_input
+from .utils_aug import CenterCrop, ImageNetPolicy, RandomResizedCrop, Resize
 
 
 class ClsDatasets(keras.utils.Sequence):
-    def __init__(self, annotation_lines, input_shape, batch_size, num_classes, train):
+    def __init__(self, annotation_lines, input_shape, batch_size, num_classes, train, autoaugment_flag=True):
         self.annotation_lines   = annotation_lines
         self.length             = len(self.annotation_lines)
         
@@ -19,6 +20,15 @@ class ClsDatasets(keras.utils.Sequence):
         self.batch_size         = batch_size
         self.num_classes        = num_classes
         self.train              = train
+        
+        self.autoaugment_flag   = autoaugment_flag
+        if self.autoaugment_flag:
+            self.resize_crop = RandomResizedCrop(input_shape)
+            self.policy      = ImageNetPolicy()
+            
+            self.resize      = Resize(input_shape[0] if input_shape[0] == input_shape[1] else input_shape)
+            self.center_crop = CenterCrop(input_shape)
+
 
     def __len__(self):
         return math.ceil(len(self.annotation_lines) / float(self.batch_size))
@@ -31,7 +41,10 @@ class ClsDatasets(keras.utils.Sequence):
             
             annotation_path = self.annotation_lines[i].split(';')[1].split()[0]
             image = Image.open(annotation_path)
-            image = self.get_random_data(image, self.input_shape, random=self.train)
+            if self.autoaugment_flag:
+                image = self.AutoAugment(image, random=self.train)
+            else:
+                image = self.get_random_data(image, self.input_shape, random=self.train)
             image = preprocess_input(np.array(image).astype(np.float32))
 
             X_train.append(image)
@@ -51,7 +64,10 @@ class ClsDatasets(keras.utils.Sequence):
                     np.random.shuffle(self.annotation_lines)
                 annotation_path = self.annotation_lines[i].split(';')[1].split()[0]
                 image = Image.open(annotation_path)
-                image = self.get_random_data(image, self.input_shape, random=self.train)
+                if self.autoaugment_flag:
+                    image = self.AutoAugment(image, random=self.train)
+                else:
+                    image = self.get_random_data(image, self.input_shape, random=self.train)
                 image = preprocess_input(np.array(image).astype(np.float32))
 
                 X_train.append(image)
@@ -154,4 +170,26 @@ class ClsDatasets(keras.utils.Sequence):
         image_data = cv2.merge((cv2.LUT(hue, lut_hue), cv2.LUT(sat, lut_sat), cv2.LUT(val, lut_val)))
         image_data = cv2.cvtColor(image_data, cv2.COLOR_HSV2RGB)
         return image_data
+    
+    def AutoAugment(self, image, random=True):
+        if not random:
+            image = self.resize(image)
+            image = self.center_crop(image)
+            return image
 
+        #------------------------------------------#
+        #   resize并且随即裁剪
+        #------------------------------------------#
+        image = self.resize_crop(image)
+        
+        #------------------------------------------#
+        #   翻转图像
+        #------------------------------------------#
+        flip = self.rand()<.5
+        if flip: image = image.transpose(Image.FLIP_LEFT_RIGHT)
+        
+        #------------------------------------------#
+        #   随机增强
+        #------------------------------------------#
+        image = self.policy(image)
+        return image

@@ -29,6 +29,12 @@ if __name__ == "__main__":
     #----------------------------------------------------#
     eager           = False
     #---------------------------------------------------------------------#
+    #   train_gpu   训练用到的GPU
+    #               默认为第一张卡、双卡为[0, 1]、三卡为[0, 1, 2]
+    #               在使用多GPU时，每个卡上的batch为总batch除以卡的数量。
+    #---------------------------------------------------------------------#
+    train_gpu       = [0,]
+    #---------------------------------------------------------------------#
     #   classes_path    指向model_data下的txt，与自己训练的数据集相关 
     #                   训练前一定要修改classes_path，使其对应自己的数据集
     #---------------------------------------------------------------------#
@@ -165,24 +171,55 @@ if __name__ == "__main__":
     test_annotation_path    = 'cls_test.txt'
 
     #------------------------------------------------------#
+    #   设置用到的显卡
+    #------------------------------------------------------#
+    os.environ["CUDA_VISIBLE_DEVICES"]  = ','.join(str(x) for x in train_gpu)
+    ngpus_per_node                      = len(train_gpu)
+    
+    gpus = tf.config.experimental.list_physical_devices(device_type='GPU')
+    for gpu in gpus:
+        tf.config.experimental.set_memory_growth(gpu, True)
+        
+    if ngpus_per_node > 1:
+        strategy = tf.distribute.MirroredStrategy()
+    else:
+        strategy = None
+    print('Number of devices: {}'.format(ngpus_per_node))
+
+    #------------------------------------------------------#
     #   获取classes
     #------------------------------------------------------#
     class_names, num_classes = get_classes(classes_path)
 
-    #------------------------------------------------------#
-    #   创建分类模型
-    #------------------------------------------------------#
-    if backbone == "mobilenet":
-        model = get_model_from_name[backbone](input_shape=[input_shape[0], input_shape[1], 3], classes=num_classes, alpha=alpha)
+    if ngpus_per_node > 1:
+        with strategy.scope():
+            #------------------------------------------------------#
+            #   创建分类模型
+            #------------------------------------------------------#
+            if backbone == "mobilenet":
+                model = get_model_from_name[backbone](input_shape=[input_shape[0], input_shape[1], 3], classes=num_classes, alpha=alpha)
+            else:
+                model = get_model_from_name[backbone](input_shape=[input_shape[0], input_shape[1], 3], classes=num_classes)
+            if model_path != "":
+                #------------------------------------------------------#
+                #   载入预训练权重
+                #------------------------------------------------------#
+                print('Load weights {}.'.format(model_path))
+                model.load_weights(model_path, by_name=True, skip_mismatch=True)
     else:
-        model = get_model_from_name[backbone](input_shape=[input_shape[0], input_shape[1], 3], classes=num_classes)
-    
-    if model_path != "":
         #------------------------------------------------------#
-        #   载入预训练权重
+        #   创建分类模型
         #------------------------------------------------------#
-        print('Load weights {}.'.format(model_path))
-        model.load_weights(model_path, by_name=True, skip_mismatch=True)
+        if backbone == "mobilenet":
+            model = get_model_from_name[backbone](input_shape=[input_shape[0], input_shape[1], 3], classes=num_classes, alpha=alpha)
+        else:
+            model = get_model_from_name[backbone](input_shape=[input_shape[0], input_shape[1], 3], classes=num_classes)
+        if model_path != "":
+            #------------------------------------------------------#
+            #   载入预训练权重
+            #------------------------------------------------------#
+            print('Load weights {}.'.format(model_path))
+            model.load_weights(model_path, by_name=True, skip_mismatch=True)
 
     #---------------------------#
     #   读取数据集对应的txt
@@ -316,15 +353,19 @@ if __name__ == "__main__":
                 K.set_value(optimizer.lr, lr)
 
                 fit_one_epoch(model, loss_history, optimizer, epoch, epoch_step, epoch_step_val, gen, gen_val, 
-                            end_epoch, save_period, save_dir)
+                            end_epoch, save_period, save_dir, strategy)
 
                 train_dataloader.on_epoch_end()
                 val_dataloader.on_epoch_end()
         else:
             start_epoch = Init_Epoch
             end_epoch   = Freeze_Epoch if Freeze_Train else UnFreeze_Epoch
-                
-            model.compile(loss = 'categorical_crossentropy', optimizer = optimizer, metrics = ['categorical_accuracy'])
+            
+            if ngpus_per_node > 1:
+                with strategy.scope():
+                    model.compile(loss = 'categorical_crossentropy', optimizer = optimizer, metrics = ['categorical_accuracy'])
+            else:
+                model.compile(loss = 'categorical_crossentropy', optimizer = optimizer, metrics = ['categorical_accuracy'])
             #-------------------------------------------------------------------------------#
             #   训练参数的设置
             #   logging         用于设置tensorboard的保存地址
@@ -344,8 +385,8 @@ if __name__ == "__main__":
 
             if start_epoch < end_epoch:
                 print('Train on {} samples, val on {} samples, with batch size {}.'.format(num_train, num_val, batch_size))
-                model.fit_generator(
-                    generator           = train_dataloader,
+                model.fit(
+                    x                   = train_dataloader,
                     steps_per_epoch     = epoch_step,
                     validation_data     = val_dataloader,
                     validation_steps    = epoch_step_val,
@@ -385,7 +426,11 @@ if __name__ == "__main__":
                 
                 for i in range(len(model.layers)): 
                     model.layers[i].trainable = True
-                model.compile(loss = 'categorical_crossentropy', optimizer = optimizer, metrics = ['categorical_accuracy'])
+                if ngpus_per_node > 1:
+                    with strategy.scope():
+                        model.compile(loss = 'categorical_crossentropy', optimizer = optimizer, metrics = ['categorical_accuracy'])
+                else:
+                    model.compile(loss = 'categorical_crossentropy', optimizer = optimizer, metrics = ['categorical_accuracy'])
 
                 epoch_step      = num_train // batch_size
                 epoch_step_val  = num_val // batch_size
@@ -397,8 +442,8 @@ if __name__ == "__main__":
                 val_dataloader.batch_size      = Unfreeze_batch_size
 
                 print('Train on {} samples, val on {} samples, with batch size {}.'.format(num_train, num_val, batch_size))
-                model.fit_generator(
-                    generator           = train_dataloader,
+                model.fit(
+                    x                   = train_dataloader,
                     steps_per_epoch     = epoch_step,
                     validation_data     = val_dataloader,
                     validation_steps    = epoch_step_val,

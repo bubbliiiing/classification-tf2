@@ -35,7 +35,12 @@ class Classification(object):
         #   当使用mobilenet的alpha值
         #   仅在backbone='mobilenet'的时候有效
         #--------------------------------------------------------------------#
-        "alpha"         : 0.25
+        "alpha"         : 0.25,
+        #--------------------------------------------------------------------#
+        #   该变量用于控制是否使用letterbox_image对输入图像进行不失真的resize
+        #   否则对图像进行CenterCrop
+        #--------------------------------------------------------------------#
+        "letterbox_image"   : False,
     }
 
     @classmethod
@@ -88,7 +93,7 @@ class Classification(object):
         #---------------------------------------------------#
         #   对图片进行不失真的resize
         #---------------------------------------------------#
-        image_data  = letterbox_image(image, [self.input_shape[1], self.input_shape[0]])
+        image_data  = letterbox_image(image, [self.input_shape[1], self.input_shape[0]], self.letterbox_image)
         #---------------------------------------------------------#
         #   归一化+添加上batch_size维度
         #---------------------------------------------------------#
