@@ -40,7 +40,11 @@ class ClsDatasets(keras.utils.Sequence):
             i               = i % self.length
             
             annotation_path = self.annotation_lines[i].split(';')[1].split()[0]
-            image = Image.open(annotation_path)
+            image   = Image.open(annotation_path)
+            #------------------------------#
+            #   读取图像并转换成RGB图像
+            #------------------------------#
+            image   = cvtColor(image)
             if self.autoaugment_flag:
                 image = self.AutoAugment(image, random=self.train)
             else:
@@ -64,6 +68,10 @@ class ClsDatasets(keras.utils.Sequence):
                     np.random.shuffle(self.annotation_lines)
                 annotation_path = self.annotation_lines[i].split(';')[1].split()[0]
                 image = Image.open(annotation_path)
+                #------------------------------#
+                #   读取图像并转换成RGB图像
+                #------------------------------#
+                image   = cvtColor(image)
                 if self.autoaugment_flag:
                     image = self.AutoAugment(image, random=self.train)
                 else:
@@ -86,10 +94,6 @@ class ClsDatasets(keras.utils.Sequence):
         return np.random.rand()*(b-a) + a
 
     def get_random_data(self, image, input_shape, jitter=.3, hue=.1, sat=0.7, val=0.3, random=True):
-        #------------------------------#
-        #   读取图像并转换成RGB图像
-        #------------------------------#
-        image   = cvtColor(image)
         #------------------------------#
         #   获得图像的高宽与目标高宽
         #------------------------------#
