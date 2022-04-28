@@ -34,15 +34,31 @@ def get_train_step_fn(strategy):
             return strategy.reduce(tf.distribute.ReduceOp.MEAN, per_replica_losses, axis=None), strategy.reduce(tf.distribute.ReduceOp.MEAN, per_replica_acc, axis=None)
         return distributed_train_step
 
-@tf.function
-def val_step(batch_images, batch_labels, net, optimizer):
-    predict     = net(batch_images)
-    loss_value  = tf.reduce_mean(tf.losses.categorical_crossentropy(batch_labels, predict))
-    acc         = tf.reduce_mean(tf.cast(tf.equal(tf.argmax(predict, axis=-1), tf.argmax(batch_labels, axis=-1)), tf.float32))
-    return loss_value, acc
-
+#----------------------#
+#   防止bug
+#----------------------#
+def get_val_step_fn(strategy):
+    @tf.function
+    def val_step(batch_images, batch_labels, net, optimizer):
+        predict     = net(batch_images)
+        loss_value  = tf.reduce_mean(tf.losses.categorical_crossentropy(batch_labels, predict))
+        acc         = tf.reduce_mean(tf.cast(tf.equal(tf.argmax(predict, axis=-1), tf.argmax(batch_labels, axis=-1)), tf.float32))
+        return loss_value, acc
+    if strategy == None:
+        return val_step
+    else:
+        #----------------------#
+        #   多gpu验证
+        #----------------------#
+        @tf.function
+        def distributed_val_step(images, targets, net, optimizer):
+            per_replica_losses, per_replica_acc = strategy.run(val_step, args=(images, targets, net, optimizer,))
+            return strategy.reduce(tf.distribute.ReduceOp.MEAN, per_replica_losses, axis=None), strategy.reduce(tf.distribute.ReduceOp.MEAN, per_replica_acc, axis=None)
+        return distributed_val_step
+    
 def fit_one_epoch(net, loss_history, optimizer, epoch, epoch_step, epoch_step_val, gen, gen_val, Epoch, save_period, save_dir, strategy):
     train_step  = get_train_step_fn(strategy)
+    val_step    = get_val_step_fn(strategy)
 
     total_loss  = 0
     total_acc   = 0
@@ -53,7 +69,6 @@ def fit_one_epoch(net, loss_history, optimizer, epoch, epoch_step, epoch_step_va
         for iteration, batch in enumerate(gen):
             if iteration>=epoch_step:
                 break
-            batch = [tf.convert_to_tensor(part) for part in batch]
             batch_images, batch_labels = batch
 
             loss_value, acc = train_step(batch_images, batch_labels, net, optimizer)
@@ -71,7 +86,6 @@ def fit_one_epoch(net, loss_history, optimizer, epoch, epoch_step, epoch_step_va
         for iteration, batch in enumerate(gen_val):
             if iteration>=epoch_step_val:
                 break
-            batch = [tf.convert_to_tensor(part) for part in batch]
             batch_images, batch_labels = batch
 
             loss_value, acc = val_step(batch_images, batch_labels, net, optimizer)
