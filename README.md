@@ -21,8 +21,8 @@ tensorflow-gpu==2.2.0
 
 ## 文件下载
 训练所需的预训练权重都可以在百度云下载。     
-链接: https://pan.baidu.com/s/1AAj9aGNNAsGMtKlOGmPWUQ     
-提取码: mmjk     
+链接: https://pan.baidu.com/s/1x3WNXHqM0_3SxvuQphRJbw       
+提取码: jnez      
 
 训练所用的示例猫狗数据集也可以在百度云下载。   
 链接: https://pan.baidu.com/s/1hYBNG0TnGIeWw1-SwkzqpA      
