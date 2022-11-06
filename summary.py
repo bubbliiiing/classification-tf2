@@ -1,21 +1,19 @@
 #--------------------------------------------#
 #   该部分代码只用于看网络结构，并非测试代码
 #--------------------------------------------#
-from nets.mobilenet import MobileNet
-from nets.resnet50 import ResNet50
-from nets.vgg16 import VGG16
-from nets.vit import VisionTransformer
+from nets import get_model_from_name
 from utils.utils import net_flops
 
 if __name__ == "__main__":
     input_shape     = [224, 224]
     num_classes     = 1000
+    backbone        = "swin_transformer_tiny"
     
-    model = MobileNet([input_shape[0], input_shape[1], 3], classes=num_classes)
+    model = get_model_from_name[backbone]([input_shape[0], input_shape[1], 3], classes=num_classes)
     #--------------------------------------------#
     #   查看网络结构网络结构
     #--------------------------------------------#
-    # model.summary()
+    model.summary()
     #--------------------------------------------#
     #   计算网络的FLOPS
     #--------------------------------------------#
