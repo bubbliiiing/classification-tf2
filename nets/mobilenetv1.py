@@ -101,5 +101,5 @@ def relu6(x):
     return K.relu(x, max_value=6)
 
 if __name__ == '__main__':
-    model = MobileNet(input_shape=(224, 224, 3))
+    model = MobileNetV1(input_shape=(224, 224, 3))
     model.summary()
